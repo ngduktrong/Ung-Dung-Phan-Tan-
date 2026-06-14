@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Distributed PickleDB · Cluster Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #eef2f5;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            padding: 2rem 1.5rem;
+            color: #1a2c3e;
+        }
+
+        /* smooth container */
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* header section */
+        .hero {
+            margin-bottom: 2rem;
+        }
+
+        .hero h1 {
+            font-size: 1.9rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #1f3b4c, #2c5a6e);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+            display: inline-block;
+        }
+
+        .hero .sub {
+            color: #4a6272;
+            margin-top: 0.3rem;
+            font-size: 0.9rem;
+            border-left: 3px solid #2c7da0;
+            padding-left: 0.75rem;
+        }
+
+        /* card base */
+        .card {
+            background: #ffffff;
+            border-radius: 1.25rem;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem 1.8rem;
+            margin-bottom: 2rem;
+            transition: box-shadow 0.2s ease;
+            border: 1px solid #e9edf2;
+        }
+
+        .card:hover {
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.05);
+        }
+
+        .card h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #1f3e4b;
+            border-left: 4px solid #2c7da0;
+            padding-left: 0.9rem;
+        }
+
+        /* status badges grid */
+        .status-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.9rem;
+            align-items: center;
+        }
+
+        .status-badge {
+            background: #f8fafc;
+            border-radius: 80px;
+            padding: 0.5rem 1.2rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-weight: 500;
+            font-size: 0.9rem;
+            border: 1px solid #e2e8f0;
+            backdrop-filter: blur(2px);
+            transition: all 0.1s;
+        }
+
+        .status-badge .node-name {
+            font-family: monospace;
+            font-weight: 600;
+            color: #1e2f3a;
+        }
+
+        .online-badge, .offline-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.2rem 0.7rem;
+            border-radius: 40px;
+            letter-spacing: 0.3px;
+        }
+
+        .online-badge {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+        }
+
+        .offline-badge {
+            background: #ffe4e2;
+            color: #b91c1c;
+            border: 1px solid #ffcdca;
+        }
+
+        /* data list (current & replica inner) */
+        .data-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .data-row {
+            background: #fbfdff;
+            padding: 0.6rem 0.9rem;
+            border-radius: 0.9rem;
+            border-left: 3px solid #cbdde6;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.9rem;
+            word-break: break-word;
+            white-space: pre-wrap;
+            transition: background 0.1s;
+            border-bottom: 1px solid #f0f2f5;
+        }
+
+        .data-row strong {
+            color: #1f6e8c;
+            font-weight: 600;
+            background: #eef4fc;
+            padding: 0.1rem 0.4rem;
+            border-radius: 6px;
+            font-family: monospace;
+        }
+
+        /* replica cards (flex grid) */
+        .replica-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.4rem;
+            margin-top: 0.5rem;
+        }
+
+        .replica-card {
+            flex: 1 1 280px;
+            background: #fefefe;
+            border-radius: 1rem;
+            border: 1px solid #e9edf2;
+            overflow: hidden;
+            transition: 0.1s linear;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        }
+
+        .replica-card-header {
+            background: #f9fcff;
+            padding: 0.9rem 1rem;
+            border-bottom: 1px solid #eef2f6;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .replica-name {
+            font-weight: 700;
+            font-family: monospace;
+            font-size: 0.95rem;
+            background: #eef2fa;
+            padding: 0.2rem 0.6rem;
+            border-radius: 30px;
+            color: #1f4e6e;
+        }
+
+        .replica-badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.2rem 0.7rem;
+            border-radius: 50px;
+        }
+
+        .badge-ok {
+            background: #e0f2e9;
+            color: #0b5e42;
+        }
+
+        .badge-error {
+            background: #ffe6e5;
+            color: #bc1c2e;
+        }
+
+        .replica-card-body {
+            padding: 1rem;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .replica-data-row {
+            font-size: 0.85rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px dashed #edf2f7;
+            font-family: monospace;
+            word-break: break-word;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .replica-data-row .replica-key {
+            font-weight: 700;
+            color: #236b8e;
+            min-width: 85px;
+            background: #f1f5f9;
+            padding: 0.1rem 0.4rem;
+            border-radius: 12px;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .error-message {
+            color: #c2412c;
+            background: #fff4f2;
+            padding: 0.6rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        /* form styling */
+        .form-grid {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .input-group {
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #5b6f82;
+            margin-bottom: 0.3rem;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            border: 1px solid #cfdee9;
+            background: white;
+            font-size: 0.9rem;
+            transition: 0.15s;
+            font-family: monospace;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #2c7da0;
+            box-shadow: 0 0 0 3px rgba(44,125,160,0.1);
+        }
+
+        button {
+            background: #1f6e8c;
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 0.7rem 1.8rem;
+            border-radius: 2rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            letter-spacing: 0.3px;
+            height: fit-content;
+        }
+
+        button:hover {
+            background: #0e5a77;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 16px -8px rgba(0, 0, 0, 0.15);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        /* empty and error messages inside cards */
+        .info-placeholder {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 1rem;
+            text-align: center;
+            color: #5d7182;
+            font-size: 0.9rem;
+            border: 1px dashed #cbdae6;
+        }
+
+        /* misc spacing */
+        hr {
+            margin: 0.5rem 0;
+        }
+
+        .scrollable-data {
+            max-height: 380px;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+        }
+
+        /* responsive */
+        @media (max-width: 720px) {
+            body {
+                padding: 1rem;
+            }
+            .card {
+                padding: 1.2rem;
+            }
+            .form-grid {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            button {
+                width: 100%;
+                margin-top: 0.25rem;
+            }
+            .replica-card {
+                flex: 1 1 100%;
+            }
+            .status-badge {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard-container">
+    <div class="hero">
+        <h1>🍍 Distributed PickleDB</h1>
+        <div class="sub">real-time cluster status · fault-tolerant key-value store</div>
+    </div>
+
+    <!-- Node Status Card -->
+    <div class="card">
+        <h2>📡 Node Health & Status</h2>
+        <div id="status">Loading cluster status...</div>
+    </div>
+
+    <!-- Current Data Card (Master / Primary) -->
+    <div class="card">
+        <h2>📚 Current Data (Primary View)</h2>
+        <div id="data" class="scrollable-data">Loading entries...</div>
+    </div>
+
+    <!-- Replica Data Card (Distributed snapshot) -->
+    <div class="card">
+        <h2>🔄 Replica Data & Consistency</h2>
+        <div id="replica-data">Fetching replicas...</div>
+    </div>
+
+    <!-- Add Data Card -->
+    <div class="card">
+        <h2>✏️ Insert / Update Entry</h2>
+        <div class="form-grid">
+            <div class="input-group">
+                <label>🔑 KEY</label>
+                <input type="text" id="key" placeholder="e.g., user:session, config:timeout" autocomplete="off">
+            </div>
+            <div class="input-group">
+                <label>📦 VALUE (string or JSON)</label>
+                <input type="text" id="value" placeholder="any text, number, or JSON">
+            </div>
+            <button type="button" id="saveBtn">💾 SAVE → sync to cluster</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // DOM elements
+    const statusElement = document.getElementById("status");
+    const dataElement = document.getElementById("data");
+    const replicaDataElement = document.getElementById("replica-data");
+    const keyInput = document.getElementById("key");
+    const valueInput = document.getElementById("value");
+    const saveButton = document.getElementById("saveBtn");
+
+    // Helper: format value for display (stringify if object, keep string)
+    function formatValue(value) {
+        if (value === null || value === undefined) return "∅";
+        if (typeof value === "string") return value;
+        if (typeof value === "number" || typeof value === "boolean") return String(value);
+        try {
+            return JSON.stringify(value, null, 0);
+        } catch (e) {
+            return String(value);
+        }
+    }
+
+    // display simple message inside container (for errors / empty states)
+    function setMessage(element, message, className = "info-placeholder") {
+        const wrapper = document.createElement("div");
+        wrapper.className = className;
+        wrapper.textContent = message;
+        element.replaceChildren(wrapper);
+    }
+
+    // ===================== LOAD NODE STATUS (enhanced badges) ==================
+    async function loadStatus() {
+        try {
+            const response = await fetch("/status");
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            const entries = Object.entries(data);
+
+            if (!entries.length) {
+                setMessage(statusElement, "⚠️ No replicas configured in cluster", "info-placeholder");
+                return;
+            }
+
+            const container = document.createElement("div");
+            container.className = "status-grid";
+
+            for (const [node, state] of entries) {
+                const badge = document.createElement("div");
+                badge.className = "status-badge";
+                const nodeSpan = document.createElement("span");
+                nodeSpan.className = "node-name";
+                nodeSpan.textContent = node;
+                const stateSpan = document.createElement("span");
+                const isOnline = (state === "ONLINE" || state === "online");
+                stateSpan.className = isOnline ? "online-badge" : "offline-badge";
+                stateSpan.textContent = isOnline ? "● ONLINE" : "○ OFFLINE";
+                badge.appendChild(nodeSpan);
+                badge.appendChild(stateSpan);
+                container.appendChild(badge);
+            }
+            statusElement.replaceChildren(container);
+        } catch (error) {
+            setMessage(statusElement, "🔌 Cannot connect to /status — is backend running?", "info-placeholder error");
+            console.error(error);
+        }
+    }
+
+    // ===================== LOAD PRIMARY DATA ==================
+    async function loadData() {
+        try {
+            const response = await fetch("/data");
+            if (!response.ok) throw new Error(`Failed to fetch data: ${response.status}`);
+            const data = await response.json();
+            const entries = Object.entries(data);
+
+            if (!entries.length) {
+                setMessage(dataElement, "📭 No data stored yet — use the form to add entries", "info-placeholder");
+                return;
+            }
+
+            const listContainer = document.createElement("div");
+            listContainer.className = "data-list";
+
+            for (const [key, value] of entries) {
+                const row = document.createElement("div");
+                row.className = "data-row";
+                const strongKey = document.createElement("strong");
+                strongKey.textContent = key;
+                row.appendChild(strongKey);
+                row.append(document.createTextNode(" : "));
+                const valueSpan = document.createElement("span");
+                valueSpan.style.fontFamily = "monospace";
+                valueSpan.style.wordBreak = "break-word";
+                valueSpan.textContent = formatValue(value);
+                row.appendChild(valueSpan);
+                listContainer.appendChild(row);
+            }
+            dataElement.replaceChildren(listContainer);
+        } catch (error) {
+            setMessage(dataElement, "⚠️ Failed to load primary data — check server", "info-placeholder error");
+            console.error(error);
+        }
+    }
+
+    // ===================== LOAD REPLICA DATA (enhanced cards) ==================
+    async function loadReplicaData() {
+        try {
+            const response = await fetch("/replica-data");
+            if (!response.ok) throw new Error(`Replica fetch error: ${response.status}`);
+            const data = await response.json();
+            const entries = Object.entries(data);
+
+            if (!entries.length) {
+                setMessage(replicaDataElement, "🪞 No replicas discovered — cluster might be empty", "info-placeholder");
+                return;
+            }
+
+            // create flex container for replica cards
+            const replicaGrid = document.createElement("div");
+            replicaGrid.className = "replica-container";
+
+            for (const [nodeName, result] of entries) {
+                const card = document.createElement("div");
+                card.className = "replica-card";
+
+                // Header: node + status badge
+                const header = document.createElement("div");
+                header.className = "replica-card-header";
+                const nodeTitle = document.createElement("span");
+                nodeTitle.className = "replica-name";
+                nodeTitle.textContent = nodeName;
+                header.appendChild(nodeTitle);
+
+                const statusBadgeSpan = document.createElement("span");
+                const isHealthy = (result?.status === "ok");
+                statusBadgeSpan.className = isHealthy ? "replica-badge badge-ok" : "replica-badge badge-error";
+                statusBadgeSpan.textContent = isHealthy ? "✓ reachable" : "✗ unreachable";
+                header.appendChild(statusBadgeSpan);
+                card.appendChild(header);
+
+                const body = document.createElement("div");
+                body.className = "replica-card-body";
+
+                if (!isHealthy) {
+                    const errorDiv = document.createElement("div");
+                    errorDiv.className = "error-message";
+                    errorDiv.textContent = result?.error || "REPLICA OFFLINE / TIMEOUT";
+                    body.appendChild(errorDiv);
+                } else {
+                    const snapshot = result?.data || {};
+                    const snapshotEntries = Object.entries(snapshot);
+                    if (snapshotEntries.length === 0) {
+                        const emptyNote = document.createElement("div");
+                        emptyNote.className = "info-placeholder";
+                        emptyNote.style.fontSize = "0.8rem";
+                        emptyNote.style.padding = "0.6rem";
+                        emptyNote.textContent = "📭 No data on this replica";
+                        body.appendChild(emptyNote);
+                    } else {
+                        for (const [k, v] of snapshotEntries) {
+                            const row = document.createElement("div");
+                            row.className = "replica-data-row";
+                            const keySpan = document.createElement("span");
+                            keySpan.className = "replica-key";
+                            keySpan.textContent = k;
+                            const valSpan = document.createElement("span");
+                            valSpan.style.wordBreak = "break-word";
+                            valSpan.style.flex = "1";
+                            valSpan.textContent = formatValue(v);
+                            row.appendChild(keySpan);
+                            row.appendChild(valSpan);
+                            body.appendChild(row);
+                        }
+                    }
+                }
+                card.appendChild(body);
+                replicaGrid.appendChild(card);
+            }
+            replicaDataElement.replaceChildren(replicaGrid);
+        } catch (error) {
+            setMessage(replicaDataElement, "❌ Cannot fetch replica data — network or server error", "info-placeholder error");
+            console.error(error);
+        }
+    }
+
+    // ===================== SAVE DATA ==================
+    async function saveData() {
+        const key = keyInput.value.trim();
+        const value = valueInput.value;  // allow empty string
+
+        if (!key) {
+            alert("⛔ Key cannot be empty");
+            keyInput.focus();
+            return;
+        }
+
+        // disable button briefly to avoid double send
+        const originalText = saveButton.textContent;
+        saveButton.textContent = "⏳ Syncing...";
+        saveButton.disabled = true;
+
+        try {
+            const response = await fetch("/set", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ key, value })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => "unknown error");
+                throw new Error(`Server responded ${response.status}: ${errorText}`);
+            }
+
+            // clear inputs on success
+            keyInput.value = "";
+            valueInput.value = "";
+
+            // refresh both primary + replica views
+            await Promise.all([loadData(), loadReplicaData()]);
+
+            // optional visual feedback
+            saveButton.textContent = "✓ SAVED!";
+            setTimeout(() => {
+                if (saveButton) saveButton.textContent = originalText;
+            }, 1200);
+        } catch (err) {
+            console.error(err);
+            alert(`⚠️ Save failed: ${err.message || "backend unreachable"}`);
+            saveButton.textContent = originalText;
+        } finally {
+            saveButton.disabled = false;
+        }
+    }
+
+    // auto refresh with intervals (mild polling)
+    let refreshInterval;
+
+    function startPolling() {
+        if (refreshInterval) clearInterval(refreshInterval);
+        // refresh status every 4 sec, data & replica every 4 sec but not overlapping heavy
+        refreshInterval = setInterval(() => {
+            loadStatus();
+            loadData();
+            loadReplicaData();
+        }, 4000);
+    }
+
+    // attach event listeners
+    saveButton.addEventListener("click", saveData);
+    // allow pressing Enter in inputs (better UX)
+    const handleEnter = (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            saveData();
+        }
+    };
+    keyInput.addEventListener("keypress", handleEnter);
+    valueInput.addEventListener("keypress", handleEnter);
+
+    // initial load
+    loadStatus();
+    loadData();
+    loadReplicaData();
+    startPolling();
+
+    // optional: if page visibility API, keep lightweight, but not needed
+    // ensure that on error we don't break layout, just retry
+    window.addEventListener("online", () => {
+        loadStatus();
+        loadData();
+        loadReplicaData();
+    });
+</script>
+</body>
+</html>

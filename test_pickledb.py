@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from pickledb import PickleDB, PickleDBSQLite  # adjust this import if your module name is different
+from pickledb import PickleDB, PickleDBSQLite, sqlite_enable  # adjust this import if your module name is different
 
 
 # ---------------------------------------------------------------------------
@@ -317,6 +317,10 @@ async def test_async_concurrent_gets_and_sets(tmp_path):
 
 @pytest.mark.asyncio
 @pytest.mark.stress
+@pytest.mark.skipif(
+    os.getenv("RUN_STRESS_TESTS") != "1",
+    reason="Set RUN_STRESS_TESTS=1 to run the million-entry stress test.",
+)
 async def test_stress_one_million_entries(tmp_path):
     """
     Stress test inserting and retrieving 1,000,000 key-value pairs.
@@ -346,6 +350,7 @@ async def test_stress_one_million_entries(tmp_path):
 # Basic tests for PickleDBSQLite
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(not sqlite_enable, reason="aiosqlite is not installed.")
 def test_sqlite_sync_set_get_and_all(tmp_path):
     sqlite_path = tmp_path / "kv.sqlite3"
     kv = PickleDBSQLite(str(sqlite_path))
@@ -366,6 +371,7 @@ def test_sqlite_sync_set_get_and_all(tmp_path):
     kv.close()
 
 
+@pytest.mark.skipif(not sqlite_enable, reason="aiosqlite is not installed.")
 def test_sqlite_custom_table_name(tmp_path):
     sqlite_path = tmp_path / "custom.sqlite3"
     kv = PickleDBSQLite(str(sqlite_path), table_name="kv_custom_1")
@@ -376,6 +382,7 @@ def test_sqlite_custom_table_name(tmp_path):
     kv.close()
 
 
+@pytest.mark.skipif(not sqlite_enable, reason="aiosqlite is not installed.")
 def test_sqlite_rejects_invalid_table_name(tmp_path):
     sqlite_path = tmp_path / "invalid.sqlite3"
 
@@ -387,6 +394,7 @@ def test_sqlite_rejects_invalid_table_name(tmp_path):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not sqlite_enable, reason="aiosqlite is not installed.")
 async def test_sqlite_async_set_get_and_purge(tmp_path):
     sqlite_path = tmp_path / "kv_async.sqlite3"
     kv = PickleDBSQLite(str(sqlite_path))

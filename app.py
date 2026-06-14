@@ -8,6 +8,7 @@ db = PickleDB("test_db.json").load()
 db.set("ten_du_an", "pickleDB v1.6")
 db.set("phien_ban", 1.6)
 db.set("danh_sach_tinh_nang", ["Sử dụng orjson", "Hỗ trợ Async", "Hỗ trợ SQLite"])
+db.save()
 
 print("--- Đã ghi dữ liệu thành công ---")
 

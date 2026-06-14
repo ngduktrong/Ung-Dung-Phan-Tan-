@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Distributed PickleDB Dashboard</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background: #f4f6f9;
+            color: #1f2933;
+        }
+
+        h1 {
+            color: #2c3e50;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .online {
+            color: green;
+            font-weight: bold;
+        }
+
+        .offline,
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+
+        input {
+            box-sizing: border-box;
+            padding: 8px;
+            width: min(250px, 100%);
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+
+        .row {
+            margin: 8px 0;
+            overflow-wrap: anywhere;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Distributed PickleDB Dashboard</h1>
+
+<div class="card">
+    <h2>Node Status</h2>
+    <div id="status">Loading...</div>
+</div>
+
+<div class="card">
+    <h2>Current Data</h2>
+    <div id="data">Loading...</div>
+</div>
+
+<div class="card">
+    <h2>Replica Data</h2>
+    <div id="replica-data">Loading...</div>
+</div>
+
+<div class="card">
+    <h2>Add New Data</h2>
+    <input type="text" id="key" placeholder="Key">
+
+    <br><br>
+
+    <input type="text" id="value" placeholder="Value">
+
+    <br><br>
+
+    <button type="button" onclick="saveData()">SAVE</button>
+</div>
+
+<script>
+const statusElement = document.getElementById("status")
+const dataElement = document.getElementById("data")
+const replicaDataElement = document.getElementById("replica-data")
+const keyInput = document.getElementById("key")
+const valueInput = document.getElementById("value")
+
+function setMessage(element, message, className = "") {
+    const row = document.createElement("p")
+    row.className = className ? `row ${className}` : "row"
+    row.textContent = message
+    element.replaceChildren(row)
+}
+
+function formatValue(value) {
+    if (typeof value === "string") {
+        return value
+    }
+
+    try {
+        return JSON.stringify(value)
+    } catch (error) {
+        return String(value)
+    }
+}
+
+async function loadStatus() {
+    try {
+        const response = await fetch("/status")
+        if (!response.ok) {
+            throw new Error(`Status request failed: ${response.status}`)
+        }
+
+        const data = await response.json()
+        const entries = Object.entries(data)
+
+        if (entries.length === 0) {
+            setMessage(statusElement, "No replicas configured")
+            return
+        }
+
+        const fragment = document.createDocumentFragment()
+
+        for (const [node, state] of entries) {
+            const row = document.createElement("p")
+            row.className = "row"
+
+            const stateElement = document.createElement("span")
+            stateElement.className = state === "ONLINE" ? "online" : "offline"
+            stateElement.textContent = state
+
+            row.append(`${node} : `, stateElement)
+            fragment.append(row)
+        }
+
+        statusElement.replaceChildren(fragment)
+    } catch (error) {
+        setMessage(statusElement, "Cannot connect to server", "error")
+    }
+}
+
+async function loadData() {
+    try {
+        const response = await fetch("/data")
+        if (!response.ok) {
+            throw new Error(`Data request failed: ${response.status}`)
+        }
+
+        const data = await response.json()
+        const entries = Object.entries(data)
+
+        if (entries.length === 0) {
+            setMessage(dataElement, "No data available")
+            return
+        }
+
+        const fragment = document.createDocumentFragment()
+
+        for (const [key, value] of entries) {
+            const row = document.createElement("p")
+            row.className = "row"
+
+            const keyElement = document.createElement("b")
+            keyElement.textContent = key
+
+            row.append(keyElement, ` : ${formatValue(value)}`)
+            fragment.append(row)
+        }
+
+        dataElement.replaceChildren(fragment)
+    } catch (error) {
+        setMessage(dataElement, "Cannot load data", "error")
+    }
+}
+
+async function loadReplicaData() {
+    try {
+        const response = await fetch("/replica-data")
+        if (!response.ok) {
+            throw new Error(`Replica data request failed: ${response.status}`)
+        }
+
+        const data = await response.json()
+        const entries = Object.entries(data)
+
+        if (entries.length === 0) {
+            setMessage(replicaDataElement, "No replicas configured")
+            return
+        }
+
+        const fragment = document.createDocumentFragment()
+
+        for (const [node, result] of entries) {
+            const nodeTitle = document.createElement("p")
+            nodeTitle.className = "row"
+
+            const nodeElement = document.createElement("b")
+            nodeElement.textContent = node
+            nodeTitle.append(nodeElement)
+            fragment.append(nodeTitle)
+
+            if (result.status !== "ok") {
+                const errorRow = document.createElement("p")
+                errorRow.className = "row error"
+                errorRow.textContent = result.error || "UNREACHABLE"
+                fragment.append(errorRow)
+                continue
+            }
+
+            const snapshot = result.data || {}
+            const snapshotEntries = Object.entries(snapshot)
+
+            if (snapshotEntries.length === 0) {
+                const emptyRow = document.createElement("p")
+                emptyRow.className = "row"
+                emptyRow.textContent = "No replica data"
+                fragment.append(emptyRow)
+                continue
+            }
+
+            for (const [key, value] of snapshotEntries) {
+                const row = document.createElement("p")
+                row.className = "row"
+                row.textContent = `${key} : ${formatValue(value)}`
+                fragment.append(row)
+            }
+        }
+
+        replicaDataElement.replaceChildren(fragment)
+    } catch (error) {
+        setMessage(replicaDataElement, "Cannot load replica data", "error")
+    }
+}
+
+async function saveData() {
+    const key = keyInput.value.trim()
+    const value = valueInput.value
+
+    if (!key) {
+        alert("Please enter key")
+        keyInput.focus()
+        return
+    }
+
+    try {
+        const response = await fetch(
+            "/set",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    key,
+                    value,
+                }),
+            }
+        )
+
+        if (!response.ok) {
+            throw new Error(`Save request failed: ${response.status}`)
+        }
+
+        keyInput.value = ""
+        valueInput.value = ""
+
+        await loadData()
+        await loadReplicaData()
+    } catch (error) {
+        alert("Cannot save data")
+    }
+}
+
+loadStatus()
+loadData()
+loadReplicaData()
+
+setInterval(loadStatus, 5000)
+setInterval(loadData, 5000)
+setInterval(loadReplicaData, 5000)
+</script>
+
+</body>
+
+</html>
